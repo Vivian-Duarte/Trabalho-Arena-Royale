@@ -409,3 +409,213 @@ Se os contadores não aumentarem, o módulo não está mais interceptando a movi
 ## Conclusão da Etapa 1
 
 A solução final utiliza um algoritmo modular de desvio local capaz de detectar bloqueios contra paredes, bordas da arena e outras entidades, sugerindo movimentos alternativos curtos apenas quando o movimento direto está impedido.
+
+## Etapa 2 — Navegação e Verificação Espacial do Chefão
+
+A Etapa 2 teve como objetivo corrigir os travamentos específicos do Chefão/Titã durante a navegação pela arena. O problema identificado era a ausência de uma avaliação dimensional antes do deslocamento. Como o Chefão possui tamanho físico maior do que os bots comuns, alguns caminhos aparentemente livres para entidades menores eram, na prática, incompatíveis com seu raio de colisão.
+
+Para resolver esse problema, foi implementada uma validação espacial volumétrica específica para o Chefão. Antes de aplicar o movimento, o sistema verifica se o caminho projetado possui espaço suficiente para a passagem da entidade, considerando seu raio físico, margem de segurança, obstáculos, paredes, limites da arena e entidades próximas.
+
+A implementação foi feita de forma modular, sem alterar diretamente o arquivo original do jogo. A integração foi realizada no mesmo módulo de desvio local usado na Etapa 1, mantendo o interceptador `patchedMover`.
+
+### Arquivos adicionados ou atualizados
+
+- `boss-spatial-validation.js`  
+  Contém a lógica de validação espacial específica do Chefão.
+
+- `boss-spatial-validation-tests.js`  
+  Contém os testes automatizados da Etapa 2.
+
+- `bot-local-avoidance.js`  
+  Foi atualizado para integrar a validação espacial do Chefão ao sistema de desvio local já existente.
+
+### Problemas tratados na Etapa 2
+
+Durante os testes e auditorias visuais, foram identificados os seguintes problemas:
+
+- Chefão tentando atravessar vãos estreitos incompatíveis com seu tamanho.
+- Chefão colidindo com paredes e obstáculos maiores.
+- Chefão permanecendo preso em regiões com pouca folga.
+- Chefão tremendo visualmente ao tentar escapar.
+- Chefão ficando em zigue-zague ao desviar de adversários próximos.
+- Chefão ativando fuga emergencial repetidas vezes sem sair do local.
+
+### Soluções implementadas
+
+A solução final incluiu os seguintes recursos:
+
+- Validação do caminho projetado antes do deslocamento.
+- Cálculo do raio físico do Chefão.
+- Uso de margem de segurança ao redor da entidade.
+- Bloqueio preventivo de rotas estreitas.
+- Detecção de travamento visual.
+- Detecção de permanência excessiva na mesma área.
+- Escape reforçado em caso de stuck.
+- Fuga contra adversários próximos.
+- Fuga vetorial para longe de obstáculos e entidades.
+- Direção de escape comprometida, evitando zigue-zague.
+- Restrição da fuga emergencial apenas para ameaças realmente próximas.
+- Priorização da direção de escape já escolhida antes de recalcular novo pânico.
+
+---
+
+## Como carregar os módulos da Etapa 2
+
+Com o jogo aberto no navegador, execute no console:
+
+```javascript
+(async function () {
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = src + "?v=" + Date.now();
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  await loadScript("boss-spatial-validation.js");
+  await loadScript("bot-local-avoidance.js");
+  await loadScript("boss-spatial-validation-tests.js");
+
+  console.table({
+    BossSpatialValidation: typeof window.BossSpatialValidation,
+    BotLocalAvoidance: typeof window.BotLocalAvoidance,
+    BossSpatialValidationTests: typeof window.BossSpatialValidationTests,
+    moverEntidade: typeof window.moverEntidade === "function" ? window.moverEntidade.name : "undefined",
+    version: window.BotLocalAvoidance ? window.BotLocalAvoidance.version : "não carregado"
+  });
+})();
+```
+
+### Resultado esperado
+
+| Item | Valor esperado |
+|---|---|
+| `BossSpatialValidation` | `"object"` |
+| `BotLocalAvoidance` | `"object"` |
+| `BossSpatialValidationTests` | `"object"` |
+| `version` | `"2.8.2"` |
+
+---
+
+## Como executar os testes da Etapa 2
+
+Após carregar os arquivos, execute:
+
+```javascript
+BossSpatialValidationTests.run()
+```
+
+### Resultado esperado
+
+```text
+Todos os testes do Chefão passaram.
+```
+---
+
+## Como instalar o módulo no jogo real
+
+Depois que os testes passarem, execute:
+
+```javascript
+BotLocalAvoidance.install()
+```
+
+Em seguida, confirme se o interceptador foi instalado:
+
+```javascript
+moverEntidade.name
+```
+
+### Resultado esperado
+
+```text
+"patchedMover"
+```
+
+Esse resultado indica que a função original `moverEntidade()` foi envelopada pelo módulo de desvio local. A física original do jogo continua sendo responsável por aplicar o movimento final das entidades. O módulo apenas ajusta ou bloqueia o vetor de movimento antes que a física original execute o deslocamento.
+
+---
+
+## Como zerar as métricas antes da partida
+
+Antes de cada simulação, execute:
+
+```javascript
+BotLocalAvoidance.resetStats()
+BotLocalAvoidance.resetBossStats()
+BotLocalAvoidance.resetStates()
+BotLocalAvoidance.stats.stuck = 0
+```
+---
+
+## Como verificar as métricas do Chefão
+
+Durante ou após a partida, execute:
+
+```javascript
+console.table({
+  bossStuck: BotLocalAvoidance.bossStats.stuck,
+  bossVisualStuck: BotLocalAvoidance.bossStats.visualStuck,
+  bossAreaStuck: BotLocalAvoidance.bossStats.areaStuck,
+
+  bossPanicEscapes: BotLocalAvoidance.bossStats.panicEscapes,
+  bossThreatEscapes: BotLocalAvoidance.bossStats.threatEscapes,
+  bossEscapeBoosts: BotLocalAvoidance.bossStats.escapeBoosts,
+
+  bossCommittedEscapes: BotLocalAvoidance.bossStats.committedEscapes,
+  bossLastMoveMode: BotLocalAvoidance.bossStats.lastMoveMode,
+  bossLastBlockReason: BotLocalAvoidance.bossStats.lastBlockReason
+});
+```
+
+---
+
+## Significado das métricas do Chefão
+
+| Métrica | Descrição |
+|---|---|
+| `bossStuck` | Quantidade de travamentos detectados no Chefão. |
+| `bossVisualStuck` | Travamentos visuais detectados após uma tentativa de movimento. |
+| `bossAreaStuck` | Casos em que o Chefão permaneceu tempo demais na mesma região. |
+| `bossPanicEscapes` | Quantidade de fugas emergenciais contra ameaças próximas. |
+| `bossThreatEscapes` | Fugas acionadas por adversários próximos. |
+| `bossEscapeBoosts` | Escapes que utilizaram reforço temporário de velocidade. |
+| `bossCommittedEscapes` | Quantidade de vezes em que o Chefão reutilizou uma direção de fuga já escolhida. |
+| `bossLastMoveMode` | Último modo de movimento registrado. |
+| `bossLastBlockReason` | Último motivo de bloqueio ou fuga registrado. |
+
+---
+
+## Resultado esperado nas validações finais
+
+Nas validações finais, os principais indicadores de travamento devem permanecer zerados:
+
+```text
+bossStuck: 0
+bossVisualStuck: 0
+bossAreaStuck: 0
+```
+
+Esses valores indicam que o Chefão não apresentou travamentos durante a simulação real.
+
+---
+
+## Resultado final da Etapa 2
+
+A Etapa 2 foi validada na versão `2.8.2`.
+
+### Resultados obtidos
+
+- [x] 16 testes automatizados da Etapa 2 aprovados.
+- [x] Chefão sem travamento visual nas simulações finais.
+- [x] `bossStuck = 0`.
+- [x] `bossVisualStuck = 0`.
+- [x] `bossAreaStuck = 0`.
+- [x] Bots comuns revalidados após a integração.
+- [x] 15 testes da Etapa 1 aprovados novamente.
+- [x] Métricas da Etapa 1 com `wait = 0` e `stuck = 0`.
+
+Com isso, a navegação do Chefão tornou-se mais estável, coerente com seu tamanho físico e mais fluida durante o combate, mantendo a entidade ativa como ameaça real dentro da arena sem comprometer o comportamento dos bots comuns.
