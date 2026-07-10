@@ -619,3 +619,303 @@ A Etapa 2 foi validada na versão `2.8.2`.
 - [x] Métricas da Etapa 1 com `wait = 0` e `stuck = 0`.
 
 Com isso, a navegação do Chefão tornou-se mais estável, coerente com seu tamanho físico e mais fluida durante o combate, mantendo a entidade ativa como ameaça real dentro da arena sem comprometer o comportamento dos bots comuns.
+
+---
+
+## Etapa 3 — Correção do Travamento do Titã em Paredes
+
+A Etapa 3 teve como objetivo corrigir situações em que o Titã poderia ficar preso ao tentar se mover contra paredes, obstáculos ou regiões de pouca folga. Embora as etapas anteriores já tratassem desvio local e validação espacial, ainda era necessário criar uma camada específica para detectar quando o Titã tentava se mover, mas permanecia praticamente parado.
+
+A implementação foi feita de forma modular, sem alterar diretamente o arquivo principal do jogo.
+
+### Arquivos adicionados ou atualizados
+
+- `boss-wall-unstuck.js`  
+  Contém a lógica específica de detecção e destravamento do Titã em paredes.
+
+- `boss-wall-unstuck-tests.js`  
+  Contém os testes automatizados da Etapa 3.
+
+- `bot-local-avoidance.js`  
+  Foi ajustado com autorização da responsável pela funcionalidade anterior para suavizar o zigue-zague rápido do Titã quando cercado por bots, sem comprometer os testes já existentes.
+
+---
+
+## Problema tratado na Etapa 3
+
+O Titã poderia insistir em movimentos inválidos quando estivesse próximo a paredes ou obstáculos. Em alguns casos, ele tentava se mover, mas quase não saía do lugar, gerando risco de travamento visual ou funcional.
+
+Sintomas observados:
+
+- Titã tentando se mover contra paredes;
+- Titã quase parado mesmo recebendo comando de movimento;
+- necessidade de uma rotina própria de destravamento;
+- risco de interferir nas funcionalidades anteriores de desvio local e validação espacial.
+
+---
+
+## Solução implementada
+
+Foi criado o módulo `boss-wall-unstuck.js`, responsável por comparar o movimento pretendido com o movimento realmente executado pelo Titã.
+
+A lógica principal utiliza:
+
+```text
+movimentoPretendido = distância que o Titã tentou andar
+movimentoReal = distância que ele realmente saiu do lugar
+```
+
+Se o Titã se mover menos do que o limite esperado por alguns frames consecutivos, o sistema considera que existe uma possível situação de travamento e ativa um estado temporário de destravamento.
+
+Configuração final utilizada:
+
+```javascript
+stuckTriggerFrames: 2,
+stuckMoveRatio: 0.35,
+
+unstuckFrames: 45,
+unstuckCommitFrames: 18,
+unstuckSpeedMultiplier: 1.05,
+minUnstuckSpeed: 1.5,
+```
+
+Isso significa que, se o Titã andar menos de 35% do movimento pretendido por 2 frames consecutivos, o módulo ativa a rotina de destravamento.
+
+Durante o estado de destravamento, o Titã deixa de insistir na direção bloqueada e passa a testar rotas alternativas:
+
+- movimentos laterais;
+- movimentos diagonais;
+- movimento de recuo;
+- manutenção temporária da direção escolhida.
+
+Quando volta a se mover normalmente por alguns frames, o estado de destravamento é encerrado.
+
+---
+
+## Correção complementar: zigue-zague rápido do Titã
+
+Durante os testes visuais, foi identificado um comportamento em que o Titã ficava fazendo zigue-zague muito rápido quando era cercado por vários bots. Esse comportamento deixava a movimentação pouco natural, principalmente porque o Titã recalculava rotas de fuga muitas vezes em sequência.
+
+Após análise, foi observado que esse comportamento vinha principalmente da lógica de escape e repulsão do Chefão no `bot-local-avoidance.js`, e não diretamente do novo módulo `boss-wall-unstuck.js`.
+
+Com autorização da responsável pela funcionalidade anterior, foram ajustados apenas os parâmetros específicos do Chefão, preservando a lógica original e mantendo todos os testes passando.
+
+Configuração final ajustada:
+
+```javascript
+bossEscapeFrames: 80,
+bossEscapeSpeedMultiplier: 1.15,
+bossEscapeCommitFrames: 42,
+
+bossRepulsionEntityRange: 105,
+bossRepulsionEntityWeight: 2.2,
+
+bossThreatEscapeRange: 180,
+bossThreatHardRange: 90,
+bossThreatEscapeFrames: 45,
+```
+
+Com isso, o Titã continuou desviando e evitando travamentos, mas passou a manter a direção de escape por mais tempo e com menor aceleração. O zigue-zague ainda existe, mas ficou visualmente mais natural, com movimentos mais amplos e menos tremidos.
+
+---
+
+## Testes automatizados da Etapa 3
+
+A nova suíte de testes possui 7 testes:
+
+```text
+1. módulo expõe funções principais
+2. bot comum não ativa destravamento do Titã
+3. Titã parado por alguns frames ativa estado de destravamento
+4. estado de destravamento troca perseguição direta por rota alternativa
+5. direção alternativa é mantida por alguns ciclos
+6. Titã sai do estado de destravamento após movimentos válidos
+7. instalação preserva moverEntidade como função
+```
+
+Esses testes validam que:
+
+- o módulo foi carregado corretamente;
+- bots comuns não ativam a lógica do Titã;
+- o Titã entra em estado de destravamento quando necessário;
+- o Titã escolhe rotas alternativas;
+- a direção alternativa é mantida por alguns frames;
+- o estado de destravamento é encerrado após recuperação;
+- a função `moverEntidade()` continua funcionando após a instalação do módulo.
+
+---
+
+## Como carregar os módulos da Etapa 3
+
+Com o jogo aberto no navegador, execute no console:
+
+```javascript
+(async function () {
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = src + "?v=" + Date.now();
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  await loadScript("boss-spatial-validation.js");
+  await loadScript("bot-local-avoidance.js");
+  await loadScript("bot-local-avoidance-tests.js");
+  await loadScript("boss-spatial-validation-tests.js");
+  await loadScript("boss-wall-unstuck.js");
+  await loadScript("boss-wall-unstuck-tests.js");
+
+  console.table({
+    BossSpatialValidation: typeof window.BossSpatialValidation,
+    BotLocalAvoidance: typeof window.BotLocalAvoidance,
+    BotLocalAvoidanceTests: typeof window.BotLocalAvoidanceTests,
+    BossSpatialValidationTests: typeof window.BossSpatialValidationTests,
+    BossWallUnstuck: typeof window.BossWallUnstuck,
+    BossWallUnstuckTests: typeof window.BossWallUnstuckTests,
+    moverEntidade: typeof window.moverEntidade === "function" ? window.moverEntidade.name : "undefined"
+  });
+})();
+```
+
+### Resultado esperado
+
+| Item | Valor esperado |
+|---|---|
+| `BossSpatialValidation` | `"object"` |
+| `BotLocalAvoidance` | `"object"` |
+| `BotLocalAvoidanceTests` | `"object"` |
+| `BossSpatialValidationTests` | `"object"` |
+| `BossWallUnstuck` | `"object"` |
+| `BossWallUnstuckTests` | `"object"` |
+
+---
+
+## Como executar todos os testes
+
+Após carregar os módulos, execute:
+
+```javascript
+BotLocalAvoidanceTests.run()
+BossSpatialValidationTests.run()
+BossWallUnstuckTests.run()
+```
+
+### Resultado esperado
+
+```text
+Todos os testes passaram.
+Todos os testes do Chefão passaram.
+Todos os testes de destravamento do Titã passaram.
+```
+
+---
+
+## Como instalar os módulos no jogo real
+
+Depois que todos os testes passarem, execute:
+
+```javascript
+BotLocalAvoidance.install()
+BossWallUnstuck.install()
+```
+
+Confirme a instalação:
+
+```javascript
+moverEntidade.name
+```
+
+Resultado esperado:
+
+```text
+"bossWallUnstuckMover"
+```
+
+Esse resultado indica que o módulo de destravamento do Titã foi instalado por cima do módulo de desvio local, preservando a lógica anterior e adicionando uma camada extra de segurança para o Chefão.
+
+---
+
+## Como zerar as métricas antes da partida
+
+Antes de cada partida de validação, execute:
+
+```javascript
+BotLocalAvoidance.resetStats()
+BotLocalAvoidance.resetBossStats()
+BotLocalAvoidance.resetStates()
+
+BossWallUnstuck.resetStats()
+BossWallUnstuck.resetStates()
+```
+
+---
+
+## Como verificar as métricas após a partida
+
+Durante ou após a partida, execute:
+
+```javascript
+console.table({
+  botDirect: BotLocalAvoidance.stats.direct,
+  botAvoided: BotLocalAvoidance.stats.avoided,
+  botWait: BotLocalAvoidance.stats.wait,
+  botStuck: BotLocalAvoidance.stats.stuck,
+
+  bossDirect: BotLocalAvoidance.bossStats.direct,
+  bossAvoided: BotLocalAvoidance.bossStats.avoided,
+  bossWait: BotLocalAvoidance.bossStats.wait,
+  bossStuck: BotLocalAvoidance.bossStats.stuck,
+  bossVisualStuck: BotLocalAvoidance.bossStats.visualStuck,
+  bossAreaStuck: BotLocalAvoidance.bossStats.areaStuck,
+
+  bossPanicEscapes: BotLocalAvoidance.bossStats.panicEscapes,
+  bossThreatEscapes: BotLocalAvoidance.bossStats.threatEscapes,
+  bossRepulsionEscapes: BotLocalAvoidance.bossStats.repulsionEscapes,
+  bossEscapeBoosts: BotLocalAvoidance.bossStats.escapeBoosts,
+  bossCommittedEscapes: BotLocalAvoidance.bossStats.committedEscapes,
+
+  bossLastMoveMode: BotLocalAvoidance.bossStats.lastMoveMode,
+  bossLastBlockReason: BotLocalAvoidance.bossStats.lastBlockReason,
+  bossLastEscapeMultiplier: BotLocalAvoidance.bossStats.lastEscapeMultiplier,
+  bossLastThreatType: BotLocalAvoidance.bossStats.lastThreatType,
+
+  wallUnstuckDetections: BossWallUnstuck.stats.stuckDetections,
+  wallUnstuckActivations: BossWallUnstuck.stats.activations,
+  wallUnstuckRecoveries: BossWallUnstuck.stats.recoveries
+});
+```
+
+---
+
+## Significado das métricas do BossWallUnstuck
+
+| Métrica | Descrição |
+|---|---|
+| `wallUnstuckDetections` | Quantidade de vezes em que o módulo detectou possível travamento do Titã. |
+| `wallUnstuckActivations` | Quantidade de vezes em que o estado de destravamento foi ativado. |
+| `wallUnstuckRecoveries` | Quantidade de vezes em que o Titã saiu do estado de destravamento e voltou ao movimento normal. |
+
+---
+
+## Resultado final da Etapa 3
+
+A Etapa 3 foi validada com todos os testes automatizados passando.
+
+### Resultados obtidos
+
+- [x] 15 testes da Etapa 1 aprovados novamente.
+- [x] 16 testes da Etapa 2 aprovados novamente.
+- [x] 7 testes da Etapa 3 aprovados.
+- [x] Bots comuns sem travamento nas validações finais.
+- [x] Titã sem travamento visual nas validações finais.
+- [x] `botStuck = 0`.
+- [x] `bossStuck = 0`.
+- [x] `bossVisualStuck = 0`.
+- [x] `bossAreaStuck = 0`.
+- [x] Zigue-zague rápido do Titã suavizado.
+- [x] Movimento do Titã mais natural quando cercado por bots.
+
+Com isso, o Titã passou a contar com uma camada própria de destravamento em paredes, sem comprometer o comportamento dos bots comuns e sem quebrar a validação espacial já implementada anteriormente. Além disso, o ajuste complementar no comportamento do Chefão reduziu o zigue-zague acelerado, tornando a experiência de combate mais natural.
