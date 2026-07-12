@@ -750,7 +750,7 @@
         }
 
         // --- SISTEMAS DE MENU ---
-        function atualizarMenuModo() { let modo = document.getElementById("selectModo").value; if (modo === "boss") { document.getElementById("menuDificuldade").style.display = "none"; document.getElementById("menuBoss").style.display = "block"; document.getElementById("textoNivelBoss").innerText = Math.min(10, nivelChefeProgresso); } else { document.getElementById("menuDificuldade").style.display = "block"; document.getElementById("menuBoss").style.display = "none"; } }
+        function atualizarMenuModo() { let modo = document.getElementById("selectModo").value; if (modo === "boss") { document.getElementById("menuDificuldade").style.display = "none"; document.getElementById("menuBoss").style.display = "block"; document.getElementById("textoNivelBoss").innerText = nivelChefeProgresso; } else { document.getElementById("menuDificuldade").style.display = "block"; document.getElementById("menuBoss").style.display = "none"; } }
         
         function atualizarMenus() { 
             document.getElementById("menuMoedas").innerText = moedas; document.getElementById("lojaMoedas").innerText = moedas; document.getElementById("passeMoedas").innerText = moedas;
@@ -1017,6 +1017,49 @@
                 if (!isIgnoring) { if (player.hp > 0 && player.teamId !== bot.teamId) { let d = Math.hypot(player.x - bot.x, player.y - bot.y); if (d < menorD) { menorD = d; alvoM = player; } } bots.forEach(o => { if (o.teamId !== bot.teamId) { let d = Math.hypot(o.x - bot.x, o.y - bot.y); if (d < menorD) { menorD = d; alvoM = o; } } }); }
                 let visaoLimpa = alvoM ? !temParede(bot.x, bot.y, alvoM.x, alvoM.y) : false; if (alvoM && !visaoLimpa) alvoM = null; 
                 if (bot.isBoss) {
+                    // Processamento Visual e Tomada de Decisão do Chefão.
+                    // Método seguro: mantém o alvo que a lógica antiga já escolheu por 3 segundos.
+                    // Não altera movimento, armas, bots azuis ou destravamento em paredes.
+                    if (!window.BossDecisionBasicStats) {
+                        window.BossDecisionBasicStats = {
+                            locks: 0,
+                            reuses: 0,
+                            switches: 0,
+                            lastTargetId: null,
+                            lastReason: null
+                        };
+                    }
+
+                    if (alvoM) {
+                        const alvoTravadoAindaValido =
+                            bot.bossLockedTarget &&
+                            bot.bossLockedTarget.hp > 0 &&
+                            now < (bot.bossLockedUntil || 0);
+
+                        if (alvoTravadoAindaValido) {
+                            alvoM = bot.bossLockedTarget;
+                            menorD = Math.hypot(alvoM.x - bot.x, alvoM.y - bot.y);
+                            visaoLimpa = !temParede(bot.x, bot.y, alvoM.x, alvoM.y);
+
+                            window.BossDecisionBasicStats.reuses += 1;
+                            window.BossDecisionBasicStats.lastTargetId = alvoM.id || "player";
+                            window.BossDecisionBasicStats.lastReason = "mantendo_alvo_por_3_segundos";
+                        } else {
+                            const novoAlvoId = alvoM.id || "player";
+
+                            if (bot.bossLockedTargetId && bot.bossLockedTargetId !== novoAlvoId) {
+                                window.BossDecisionBasicStats.switches += 1;
+                            }
+
+                            bot.bossLockedTarget = alvoM;
+                            bot.bossLockedTargetId = novoAlvoId;
+                            bot.bossLockedUntil = now + 3000;
+
+                            window.BossDecisionBasicStats.locks += 1;
+                            window.BossDecisionBasicStats.lastTargetId = novoAlvoId;
+                            window.BossDecisionBasicStats.lastReason = "novo_alvo_travado";
+                        }
+                    }
                     if (alvoM) { bot.angle = Math.atan2(alvoM.y - bot.y, alvoM.x - bot.x); if (now - bot.lastAttackChange > 3000) { bot.attackState = Math.floor(Math.random() * 4); bot.lastAttackChange = now; } if (bot.attackState === 0) { if (menorD > 200 || !visaoLimpa) moverEntidade(bot, Math.cos(bot.angle) * bot.speed, Math.sin(bot.angle) * bot.speed); if (visaoLimpa && now - bot.lastShot > bot.shootCooldown) { for(let a = -0.2; a <= 0.2; a += 0.2) { bullets.push({ ownerId: bot.id, teamId: bot.teamId, x: bot.x, y: bot.y, angle: bot.angle + a, speed: 7, damage: bot.damage, skin: "boss" }); } bot.lastShot = now; tocarSom("tiroB"); } } else if (bot.attackState === 1) { if (menorD > 80 || !visaoLimpa) { moverEntidade(bot, Math.cos(bot.angle) * (bot.speed*1.5), Math.sin(bot.angle) * (bot.speed*1.5)); } else if (now - bot.lastShot > 1000) { tocarSom("espada"); slashes.push({x: bot.x, y: bot.y, angle: bot.angle, life: 1.0, radius: 90, skin: "boss"}); [player, ...bots].forEach(o => { if(o.hp > 0 && o.teamId !== bot.teamId && Math.hypot(o.x - bot.x, o.y - bot.y) < 100) { darDano(o, 60, o.x, o.y, true, bot.id); } }); bot.lastShot = now; } } else if (bot.attackState === 2) { if (visaoLimpa && menorD > 100 && menorD < 600 && now - bot.lastShot > 2000) { tocarSom("bomba"); basucas.push({ teamId: bot.teamId, ownerId: bot.id, x: bot.x, y: bot.y, angle: bot.angle, speed: 12, damage: 60 }); bot.lastShot = now; } else if (menorD > 600 || !visaoLimpa) { moverEntidade(bot, Math.cos(bot.angle) * bot.speed, Math.sin(bot.angle) * bot.speed); } } else if (bot.attackState === 3) { if (menorD > 150 || !visaoLimpa) moverEntidade(bot, Math.cos(bot.angle) * bot.speed, Math.sin(bot.angle) * bot.speed); if (visaoLimpa && now - bot.lastShot > 200) { bullets.push({ ownerId: bot.id, teamId: bot.teamId, x: bot.x, y: bot.y, angle: bot.angle + (Math.random()*0.8-0.4), speed: 5, damage: 5, skin: "boss" }); bot.lastShot = now; tocarSom("powerup"); } } } else { if (!bot.patrolPoint || Math.hypot(bot.patrolPoint.x - bot.x, bot.patrolPoint.y - bot.y) < 40) { bot.patrolPoint = getValidSpawn(false, false, 60); } let ang = Math.atan2(bot.patrolPoint.y - bot.y, bot.patrolPoint.x - bot.x); bot.angle = ang; moverEntidade(bot, Math.cos(ang) * bot.speed, Math.sin(ang) * bot.speed); }
                 } else { 
                     let caixaM = null; let distC = Infinity; caixas.forEach(cx => { let d = Math.hypot(cx.x - bot.x, cx.y - bot.y); if (d < distC) { distC = d; caixaM = cx; } }); let alvoV = alvoM; let indoC = false; let fugindo = false; let distR = menorD; let dBC = Math.hypot(bot.x - 750, bot.y - 750); if (caixaM && distC < 300 && !temParede(bot.x, bot.y, caixaM.x, caixaM.y)) { alvoV = caixaM; indoC = true; distR = distC; } if (modoJogo !== 'boss' && dBC > safeZone.radius - 80) { alvoV = { x: 750, y: 750 }; fugindo = true; distR = dBC; } if (!alvoV) { if (!bot.patrolPoint || Math.hypot(bot.patrolPoint.x - bot.x, bot.patrolPoint.y - bot.y) < 30) { bot.patrolPoint = getValidSpawn(false, false, 20); } alvoV = bot.patrolPoint; distR = Math.hypot(alvoV.x - bot.x, alvoV.y - bot.y); } if (alvoV) { let ang = Math.atan2(alvoV.y - bot.y, alvoV.x - bot.x); bot.angle = ang; if (alvoV === alvoM && !fugindo && !indoC) { if (!visaoLimpa || distR > 250) { moverEntidade(bot, Math.cos(bot.angle) * bot.speed, Math.sin(bot.angle) * bot.speed); } else if (distR < 150) { moverEntidade(bot, -Math.cos(bot.angle) * (bot.speed * 0.8), -Math.sin(bot.angle) * (bot.speed * 0.8)); } else { moverEntidade(bot, Math.cos(bot.angle + (Math.PI/2 * bot.strafeDir)) * bot.speed, Math.sin(bot.angle + (Math.PI/2 * bot.strafeDir)) * bot.speed); } } else { moverEntidade(bot, Math.cos(bot.angle) * bot.speed, Math.sin(bot.angle) * bot.speed); } } if (alvoM && visaoLimpa && now - bot.lastShot > bot.shootCooldown && menorD < 400) { let angleShoot = Math.atan2(alvoM.y - bot.y, alvoM.x - bot.x); bullets.push({ ownerId: bot.id, teamId: bot.teamId, x: bot.x + Math.cos(angleShoot) * 20, y: bot.y + Math.sin(angleShoot) * 20, angle: angleShoot, speed: 7, damage: bot.damage, skin: bot.skin }); bot.lastShot = now; tocarSom("tiroB"); }

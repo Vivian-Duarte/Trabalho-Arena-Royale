@@ -919,3 +919,435 @@ A Etapa 3 foi validada com todos os testes automatizados passando.
 - [x] Movimento do Titã mais natural quando cercado por bots.
 
 Com isso, o Titã passou a contar com uma camada própria de destravamento em paredes, sem comprometer o comportamento dos bots comuns e sem quebrar a validação espacial já implementada anteriormente. Além disso, o ajuste complementar no comportamento do Chefão reduziu o zigue-zague acelerado, tornando a experiência de combate mais natural.
+
+## Etapa 4 — Processamento Visual e Tomada de Decisão do Chefão
+
+A Etapa 4 teve como objetivo reduzir a paralisia decisória do Chefão/Titã quando vários agentes aparecem simultaneamente em seu campo de visão. No modo Chefão, o Titã precisa lidar ao mesmo tempo com o jogador e com os bots aliados azuis. Como a lógica original recalculava o alvo a cada frame, o Chefão podia alternar rapidamente entre diferentes inimigos, dificultando a escolha de um alvo principal.
+
+A solução implementada foi uma memória curta de alvo. Em vez de criar uma nova IA completa para o Chefão, a lógica final mantém o alvo que o próprio jogo já escolheu por 3 segundos. Durante esse tempo, o Titã ignora trocas rápidas de alvo e continua atacando o mesmo inimigo. Após os 3 segundos, ele aceita novamente o alvo definido pela lógica original.
+
+Essa abordagem foi escolhida por ser simples, segura e pouco invasiva. Ela não altera a movimentação, não altera as armas, não modifica os bots azuis e não interfere na funcionalidade anterior de destravamento do Titã em paredes.
+
+### Arquivos adicionados ou atualizados
+
+- `jogodetiro.html`  
+  Foi atualizado para adicionar uma memória curta de alvo dentro da lógica específica do Chefão.
+
+Não foram criados novos módulos para essa versão final. Durante os testes, uma abordagem com arquivo separado `boss-decision-making.js` chegou a ser experimentada, mas foi descartada porque interferia indiretamente no comportamento dos bots azuis. A solução final foi mantida diretamente no `jogodetiro.html`, dentro do bloco:
+
+```javascript
+if (bot.isBoss) {
+```
+
+Com isso, a alteração ficou restrita apenas ao Chefão.
+
+---
+
+## Problema tratado na Etapa 4
+
+Durante o modo Chefão, o Titã podia sofrer paralisia decisória quando vários alvos estavam próximos ao mesmo tempo.
+
+Sintomas observados:
+
+- Chefão alternando rapidamente entre jogador e bots aliados;
+- dificuldade para manter um alvo principal;
+- mudanças constantes de direção;
+- comportamento instável quando cercado;
+- risco de interferir nos bots azuis caso a escolha de alvo fosse refeita de forma agressiva;
+- necessidade de reduzir trocas rápidas sem quebrar as etapas anteriores.
+
+---
+
+## Solução implementada
+
+A lógica original do jogo já escolhia um alvo para cada bot e armazenava esse alvo na variável:
+
+```javascript
+alvoM
+```
+
+A solução final não substitui essa escolha. Ela apenas adiciona uma memória temporária para o Chefão.
+
+A lógica funciona assim:
+
+```text
+1. O jogo calcula normalmente o alvo mais próximo.
+2. Se a entidade atual for o Chefão, a nova lógica é executada.
+3. Se o Chefão já tiver um alvo travado e ainda não passaram 3 segundos, ele mantém esse alvo.
+4. Se não houver alvo travado ou o tempo tiver acabado, ele aceita o alvo atual da lógica original.
+5. O alvo escolhido é salvo no próprio objeto do Chefão.
+6. A lógica antiga de ataque continua funcionando normalmente.
+```
+
+A implementação adicionou três campos temporários ao objeto do Chefão:
+
+```text
+bossLockedTarget
+bossLockedTargetId
+bossLockedUntil
+```
+
+Esses campos armazenam o alvo atual do Chefão e o tempo até o qual ele deve continuar focando esse mesmo alvo.
+
+Também foi criada uma estrutura global simples para métricas:
+
+```javascript
+window.BossDecisionBasicStats = {
+  locks: 0,
+  reuses: 0,
+  switches: 0,
+  lastTargetId: null,
+  lastReason: null
+};
+```
+
+---
+
+## Trecho principal da implementação
+
+```javascript
+// Processamento Visual e Tomada de Decisão do Chefão.
+// Método seguro: mantém o alvo que a lógica antiga já escolheu por 3 segundos.
+// Não altera movimento, armas, bots azuis ou destravamento em paredes.
+if (!window.BossDecisionBasicStats) {
+    window.BossDecisionBasicStats = {
+        locks: 0,
+        reuses: 0,
+        switches: 0,
+        lastTargetId: null,
+        lastReason: null
+    };
+}
+
+if (alvoM) {
+    const alvoTravadoAindaValido =
+        bot.bossLockedTarget &&
+        bot.bossLockedTarget.hp > 0 &&
+        now < (bot.bossLockedUntil || 0);
+
+    if (alvoTravadoAindaValido) {
+        alvoM = bot.bossLockedTarget;
+        menorD = Math.hypot(alvoM.x - bot.x, alvoM.y - bot.y);
+        visaoLimpa = !temParede(bot.x, bot.y, alvoM.x, alvoM.y);
+
+        window.BossDecisionBasicStats.reuses += 1;
+        window.BossDecisionBasicStats.lastTargetId = alvoM.id || "player";
+        window.BossDecisionBasicStats.lastReason = "mantendo_alvo_por_3_segundos";
+    } else {
+        const novoAlvoId = alvoM.id || "player";
+
+        if (bot.bossLockedTargetId && bot.bossLockedTargetId !== novoAlvoId) {
+            window.BossDecisionBasicStats.switches += 1;
+        }
+
+        bot.bossLockedTarget = alvoM;
+        bot.bossLockedTargetId = novoAlvoId;
+        bot.bossLockedUntil = now + 3000;
+
+        window.BossDecisionBasicStats.locks += 1;
+        window.BossDecisionBasicStats.lastTargetId = novoAlvoId;
+        window.BossDecisionBasicStats.lastReason = "novo_alvo_travado";
+    }
+}
+```
+
+Esse bloco foi colocado antes da lógica antiga do Chefão:
+
+```javascript
+if (alvoM) {
+    bot.angle = Math.atan2(alvoM.y - bot.y, alvoM.x - bot.x);
+```
+
+Dessa forma, o Chefão continua usando a lógica antiga para andar, atacar, usar espada, atirar e lançar basuca. A única diferença é que o alvo usado por essa lógica passa a ser mais estável.
+
+---
+
+## Correção complementar no menu do Chefão
+
+Durante os testes finais, foi identificado que o menu do modo Chefão ainda exibia uma mensagem fixa relacionada ao nível 10, mesmo quando o jogador já estava em níveis mais altos.
+
+O botão utilizava:
+
+```html
+<span id="textoNivelBoss">1</span>
+```
+
+Porém, a função `atualizarMenuModo()` limitava o valor exibido com:
+
+```javascript
+Math.min(10, nivelChefeProgresso)
+```
+
+Isso fazia com que o menu exibisse no máximo o nível 10.
+
+A correção foi alterar para:
+
+```javascript
+document.getElementById("textoNivelBoss").innerText = nivelChefeProgresso;
+
+Essa alteração é apenas visual e não interfere na lógica de movimentação, colisão, ataque ou destravamento.
+
+---
+
+## Métricas adicionadas
+
+A Etapa 4 adicionou métricas simples para acompanhar a tomada de decisão do Chefão:
+
+| Métrica | Descrição |
+|---|---|
+| `locks` | Quantidade de vezes em que o Chefão travou um novo alvo. |
+| `reuses` | Quantidade de vezes em que o Chefão reutilizou o alvo travado dentro do período de 3 segundos. |
+| `switches` | Quantidade de trocas de alvo realizadas após o fim do ciclo de foco. |
+| `lastTargetId` | Último alvo focado pelo Chefão. |
+| `lastReason` | Última razão registrada pela lógica de decisão. |
+
+---
+
+## Como zerar as métricas antes da partida
+
+Antes de iniciar uma partida de validação no modo Chefão, execute:
+
+```javascript
+if (window.BotLocalAvoidance) {
+  BotLocalAvoidance.resetStats();
+  BotLocalAvoidance.resetBossStats();
+  BotLocalAvoidance.resetStates();
+}
+
+if (window.BossWallUnstuck) {
+  BossWallUnstuck.resetStats();
+  BossWallUnstuck.resetStates();
+}
+
+window.BossDecisionBasicStats = {
+  locks: 0,
+  reuses: 0,
+  switches: 0,
+  lastTargetId: null,
+  lastReason: null
+};
+
+console.log("Métricas zeradas.");
+```
+
+---
+
+## Como consultar as métricas da Etapa 4
+
+Após jogar uma partida no modo Chefão, execute:
+
+```javascript
+console.table(window.BossDecisionBasicStats)
+```
+
+Resultado esperado:
+
+```text
+locks > 0
+reuses > 0
+lastTargetId diferente de null
+lastReason: mantendo_alvo_por_3_segundos
+```
+
+Exemplo de resultado obtido nas validações:
+
+| Métrica | Resultado |
+|---|---:|
+| `locks` | 31 |
+| `reuses` | 5345 |
+| `switches` | 14 |
+| `lastTargetId` | ally2 |
+| `lastReason` | mantendo_alvo_por_3_segundos |
+
+Esses valores indicam que o Chefão travou novos alvos e reutilizou o mesmo alvo várias vezes durante os ciclos de decisão. A métrica `reuses` alta é positiva, pois mostra que o Titã manteve o foco em um alvo definido, em vez de trocar de alvo a cada frame.
+
+---
+
+## Como carregar os módulos para validação completa
+
+Com o jogo aberto no navegador, execute no console:
+
+```javascript
+(async function () {
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = src + "?v=" + Date.now();
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  await loadScript("boss-spatial-validation.js");
+  await loadScript("bot-local-avoidance.js");
+  await loadScript("bot-local-avoidance-tests.js");
+  await loadScript("boss-spatial-validation-tests.js");
+  await loadScript("boss-wall-unstuck.js");
+  await loadScript("boss-wall-unstuck-tests.js");
+
+  console.table({
+    BossSpatialValidation: typeof window.BossSpatialValidation,
+    BotLocalAvoidance: typeof window.BotLocalAvoidance,
+    BotLocalAvoidanceTests: typeof window.BotLocalAvoidanceTests,
+    BossSpatialValidationTests: typeof window.BossSpatialValidationTests,
+    BossWallUnstuck: typeof window.BossWallUnstuck,
+    BossWallUnstuckTests: typeof window.BossWallUnstuckTests,
+    moverEntidade: typeof window.moverEntidade === "function" ? window.moverEntidade.name : "undefined"
+  });
+})();
+```
+
+### Resultado esperado
+
+| Item | Valor esperado |
+|---|---|
+| `BossSpatialValidation` | `"object"` |
+| `BotLocalAvoidance` | `"object"` |
+| `BotLocalAvoidanceTests` | `"object"` |
+| `BossSpatialValidationTests` | `"object"` |
+| `BossWallUnstuck` | `"object"` |
+| `BossWallUnstuckTests` | `"object"` |
+
+---
+
+## Como executar todos os testes
+
+Após carregar os módulos, execute:
+
+```javascript
+BotLocalAvoidanceTests.run()
+BossSpatialValidationTests.run()
+BossWallUnstuckTests.run()
+```
+
+### Resultado esperado
+
+```text
+Todos os testes passaram.
+Todos os testes do Chefão passaram.
+Todos os testes de destravamento do Titã passaram.
+```
+
+---
+
+## Como instalar os módulos no jogo real
+
+Depois que todos os testes passarem, execute:
+
+```javascript
+BotLocalAvoidance.install()
+BossWallUnstuck.install()
+```
+
+Confirme a instalação:
+
+```javascript
+moverEntidade.name
+```
+
+### Resultado esperado
+
+```text
+"bossWallUnstuckMover"
+```
+
+Esse resultado indica que o módulo de destravamento do Titã foi instalado por cima do módulo de desvio local, preservando a lógica anterior e adicionando uma camada extra de segurança para o Chefão.
+
+---
+
+## Como verificar se a Etapa 4 não quebrou as etapas anteriores
+
+Após jogar uma partida no modo Chefão, execute:
+
+```javascript
+console.table({
+  botStuck: BotLocalAvoidance.stats.stuck,
+  bossStuck: BotLocalAvoidance.bossStats.stuck,
+  bossVisualStuck: BotLocalAvoidance.bossStats.visualStuck,
+  bossAreaStuck: BotLocalAvoidance.bossStats.areaStuck,
+  wallUnstuckDetections: BossWallUnstuck.stats.stuckDetections,
+  wallUnstuckActivations: BossWallUnstuck.stats.activations,
+  wallUnstuckRecoveries: BossWallUnstuck.stats.recoveries
+});
+```
+
+Resultado esperado:
+
+```text
+botStuck: 0
+bossStuck: 0
+bossVisualStuck: 0
+bossAreaStuck: 0
+```
+
+Se `wallUnstuckDetections`, `wallUnstuckActivations` e `wallUnstuckRecoveries` ficarem em `0`, isso não representa erro. Significa apenas que, naquela partida, o Titã não precisou acionar a rotina de destravamento.
+
+---
+
+## Testes visuais realizados
+
+Além dos testes automatizados, foram feitos testes visuais em dois modos:
+
+- Modo Chefão;
+- Modo Solo 1v9.
+
+No modo Chefão, foi validado que:
+
+- o Chefão mantém um alvo por 3 segundos;
+- o Chefão continua atacando normalmente;
+- os bots azuis não travam em paredes;
+- o Titã não trava em paredes;
+- o `BossWallUnstuck` continua ativo.
+
+No modo Solo 1v9, foi validado que:
+
+- os bots comuns continuam desviando de obstáculos;
+- os bots não ficam presos em paredes;
+- a funcionalidade de desvio local continua funcionando normalmente;
+- a nova lógica do Chefão não interfere no comportamento dos bots comuns.
+
+---
+
+## Resultado final da Etapa 4
+
+A Etapa 4 foi validada com sucesso.
+
+### Resultados obtidos
+
+- [x] Chefão mantém um alvo primário por 3 segundos.
+- [x] Redução de trocas rápidas de alvo.
+- [x] Lógica antiga de ataque preservada.
+- [x] Movimento do Chefão preservado.
+- [x] Armas do Chefão preservadas.
+- [x] Bots azuis sem travamento nas validações finais.
+- [x] Modo Solo 1v9 revalidado.
+- [x] Etapa 1 revalidada.
+- [x] Etapa 2 revalidada.
+- [x] Etapa 3 revalidada.
+- [x] `moverEntidade.name = "bossWallUnstuckMover"`.
+- [x] `botStuck = 0`.
+- [x] `bossStuck = 0`.
+- [x] `bossVisualStuck = 0`.
+- [x] `bossAreaStuck = 0`.
+
+### Métricas finais obtidas
+
+| Teste | Resultado |
+|---|---:|
+| `BotLocalAvoidanceTests.run()` | PASSOU |
+| `BossSpatialValidationTests.run()` | PASSOU |
+| `BossWallUnstuckTests.run()` | PASSOU |
+| `moverEntidade.name` | bossWallUnstuckMover |
+| `locks` | 31 |
+| `reuses` | 5345 |
+| `switches` | 14 |
+| `botStuck` | 0 |
+| `bossStuck` | 0 |
+| `bossVisualStuck` | 0 |
+| `bossAreaStuck` | 0 |
+| `wallUnstuckDetections` | 0 |
+| `wallUnstuckActivations` | 0 |
+| `wallUnstuckRecoveries` | 0 |
+
+Com isso, o Chefão passou a contar com uma tomada de decisão básica, estável e pouco invasiva. A solução reduz a paralisia decisória ao manter um alvo primário definido por alguns segundos, sem comprometer as etapas anteriores de desvio local, validação espacial e destravamento do Titã em paredes.
