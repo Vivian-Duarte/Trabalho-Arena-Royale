@@ -1327,10 +1327,62 @@
             bots = []; bullets = []; particles = []; damageTexts = []; bombs = []; explosions = []; slashes = []; basucas = [];
 
             if (modoJogo === 'boss') {
-                for (let i = 0; i < 3; i++) { let allySpawn = getValidSpawn(false, true, 20); bots.push({ id: "ally" + i, teamId: 1, isBoss: false, x: allySpawn.x, y: allySpawn.y, radius: 15, hp: 150, armor: 100, damage: 25, color: "#2196F3", skin: "padrao", speed: 3.6, shootCooldown: 1000, lastShot: i * 150, angle: 0, patrolPoint: null, strafeDir: Math.random() < 0.5 ? 1 : -1, stuckCounter: 0 }); }
-                let bossHp = 800 + (nivelChefeProgresso * 300); let bossSpawn = getValidSpawn(false, false, 60); bots.push({ id: "boss", teamId: 2, isBoss: true, x: bossSpawn.x, y: bossSpawn.y, radius: 40, hp: bossHp, maxHp: bossHp, armor: 0, damage: 20, color: "#900", skin: "boss", speed: 1.8 + (nivelChefeProgresso * 0.05), shootCooldown: 1500 - (nivelChefeProgresso * 50), lastShot: 0, angle: 0, attackState: 0, lastAttackChange: Date.now(), strafeDir: 1, stuckCounter: 0 });
+                for (let i = 0; i < 3; i++) {
+                    let allySpawn = getValidSpawn(false, true, 20);
+                    bots.push({
+                        id: "ally" + i,
+                        teamId: 1,
+                        isBoss: false,
+                        x: allySpawn.x,
+                        y: allySpawn.y,
+                        radius: 15,
+                        hp: 150,
+                        armor: 100,
+                        damage: 25,
+                        color: "#2196F3",
+                        skin: "padrao",
+                        speed: 3.6,
+                        shootCooldown: 1000,
+                        lastShot: i * 150,
+                        angle: 0,
+                        patrolPoint: null,
+                        strafeDir: Math.random() < 0.5 ? 1 : -1,
+                        stuckCounter: 0
+                    });
+                }
+
+                let bossHp = 800 + (nivelChefeProgresso * 300);
+                let bossSpawn = getValidSpawn(false, false, 60);
+
+                bots.push({
+                    id: "boss",
+                    teamId: 2,
+                    isBoss: true,
+                    x: bossSpawn.x,
+                    y: bossSpawn.y,
+                    radius: 40,
+                    hp: bossHp,
+                    maxHp: bossHp,
+                    armor: 0,
+                    damage: 20,
+                    color: "#900",
+                    skin: "boss",
+                    speed: 1.8 + (nivelChefeProgresso * 0.05),
+                    shootCooldown: 1500 - (nivelChefeProgresso * 50),
+                    lastShot: 0,
+                    angle: 0,
+                    attackState: 0,
+                    lastAttackChange: Date.now(),
+                    strafeDir: 1,
+                    stuckCounter: 0,
+                    // estrutura de aprendizado
+                    acoes: { 0: 0, 1: 0, 2: 0, 3: 0 },
+                    lastAction: 0
+                });
+
                 caixas = [];
-            } else {
+            }
+            else {
                 let botSpeedBase = 0.8 + (dificuldade * 0.3); let botCooldown = 2100 - (dificuldade * 300); let teamSpawns = {};
                 for (let i = 0; i < 9; i++) {
                     let bTeamId = (modoJogo === 'duo') ? Math.floor((i + 1) / 2) + 1 : i + 2; let spawnPt;
@@ -1401,7 +1453,30 @@
                 if (!isIgnoring) { if (player.hp > 0 && player.teamId !== bot.teamId) { let d = Math.hypot(player.x - bot.x, player.y - bot.y); if (d < menorD) { menorD = d; alvoM = player; } } bots.forEach(o => { if (o.teamId !== bot.teamId) { let d = Math.hypot(o.x - bot.x, o.y - bot.y); if (d < menorD) { menorD = d; alvoM = o; } } }); }
                 let visaoLimpa = alvoM ? !temParede(bot.x, bot.y, alvoM.x, alvoM.y) : false; if (alvoM && !visaoLimpa) alvoM = null;
                 if (bot.isBoss) {
-                    if (alvoM) { bot.angle = Math.atan2(alvoM.y - bot.y, alvoM.x - bot.x); if (now - bot.lastAttackChange > 3000) { bot.attackState = Math.floor(Math.random() * 4); bot.lastAttackChange = now; } if (bot.attackState === 0) { if (menorD > 200 || !visaoLimpa) moverEntidade(bot, Math.cos(bot.angle) * bot.speed, Math.sin(bot.angle) * bot.speed); if (visaoLimpa && now - bot.lastShot > bot.shootCooldown) { for (let a = -0.2; a <= 0.2; a += 0.2) { bullets.push({ ownerId: bot.id, teamId: bot.teamId, x: bot.x, y: bot.y, angle: bot.angle + a, speed: 7, damage: bot.damage, skin: "boss" }); } bot.lastShot = now; tocarSom("tiroB"); } } else if (bot.attackState === 1) { if (menorD > 80 || !visaoLimpa) { moverEntidade(bot, Math.cos(bot.angle) * (bot.speed * 1.5), Math.sin(bot.angle) * (bot.speed * 1.5)); } else if (now - bot.lastShot > 1000) { tocarSom("espada"); slashes.push({ x: bot.x, y: bot.y, angle: bot.angle, life: 1.0, radius: 90, skin: "boss" });[player, ...bots].forEach(o => { if (o.hp > 0 && o.teamId !== bot.teamId && Math.hypot(o.x - bot.x, o.y - bot.y) < 100) { darDano(o, 60, o.x, o.y, true, bot.id); } }); bot.lastShot = now; } } else if (bot.attackState === 2) { if (visaoLimpa && menorD > 100 && menorD < 600 && now - bot.lastShot > 2000) { tocarSom("bomba"); basucas.push({ teamId: bot.teamId, ownerId: bot.id, x: bot.x, y: bot.y, angle: bot.angle, speed: 12, damage: 60 }); bot.lastShot = now; } else if (menorD > 600 || !visaoLimpa) { moverEntidade(bot, Math.cos(bot.angle) * bot.speed, Math.sin(bot.angle) * bot.speed); } } else if (bot.attackState === 3) { if (menorD > 150 || !visaoLimpa) moverEntidade(bot, Math.cos(bot.angle) * bot.speed, Math.sin(bot.angle) * bot.speed); if (visaoLimpa && now - bot.lastShot > 200) { bullets.push({ ownerId: bot.id, teamId: bot.teamId, x: bot.x, y: bot.y, angle: bot.angle + (Math.random() * 0.8 - 0.4), speed: 5, damage: 5, skin: "boss" }); bot.lastShot = now; tocarSom("powerup"); } } } else { if (!bot.patrolPoint || Math.hypot(bot.patrolPoint.x - bot.x, bot.patrolPoint.y - bot.y) < 40) { bot.patrolPoint = getValidSpawn(false, false, 60); } let ang = Math.atan2(bot.patrolPoint.y - bot.y, bot.patrolPoint.x - bot.x); bot.angle = ang; moverEntidade(bot, Math.cos(ang) * bot.speed, Math.sin(ang) * bot.speed); }
+                    if (alvoM) {
+                        bot.angle = Math.atan2(alvoM.y - bot.y, alvoM.x - bot.x); if (now - bot.lastAttackChange > 3000) {
+                            let totalScore = Object.values(bot.acoes).reduce((a, b) => a + b, 0);
+                            let rand = Math.random() * (totalScore + 10); // +10 garante a exploração inicial
+
+                            let soma = 0;
+                            let escolhaEncontrada = false;
+
+                            for (let state = 0; state < 4; state++) {
+                                soma += (bot.acoes[state] || 0) + 2.5;
+                                if (rand <= soma) {
+                                    bot.attackState = state;
+                                    escolhaEncontrada = true;
+                                    break;
+                                }
+                            }
+
+                            // Fallback de segurança: se nada for escolhido, força o estado 0
+                            if (!escolhaEncontrada) bot.attackState = 0;
+
+                            console.log("Titã mudou para o ataque:", bot.attackState, "Scores:", bot.acoes);
+                            bot.lastAttackChange = now;
+                        } if (bot.attackState === 0) { if (menorD > 200 || !visaoLimpa) moverEntidade(bot, Math.cos(bot.angle) * bot.speed, Math.sin(bot.angle) * bot.speed); if (visaoLimpa && now - bot.lastShot > bot.shootCooldown) { for (let a = -0.2; a <= 0.2; a += 0.2) { bullets.push({ ownerId: bot.id, teamId: bot.teamId, x: bot.x, y: bot.y, angle: bot.angle + a, speed: 7, damage: bot.damage, skin: "boss" }); } bot.lastShot = now; tocarSom("tiroB"); } } else if (bot.attackState === 1) { if (menorD > 80 || !visaoLimpa) { moverEntidade(bot, Math.cos(bot.angle) * (bot.speed * 1.5), Math.sin(bot.angle) * (bot.speed * 1.5)); } else if (now - bot.lastShot > 1000) { tocarSom("espada"); slashes.push({ x: bot.x, y: bot.y, angle: bot.angle, life: 1.0, radius: 90, skin: "boss" });[player, ...bots].forEach(o => { if (o.hp > 0 && o.teamId !== bot.teamId && Math.hypot(o.x - bot.x, o.y - bot.y) < 100) { darDano(o, 60, o.x, o.y, true, bot.id); } }); bot.lastShot = now; } } else if (bot.attackState === 2) { if (visaoLimpa && menorD > 100 && menorD < 600 && now - bot.lastShot > 2000) { tocarSom("bomba"); basucas.push({ teamId: bot.teamId, ownerId: bot.id, x: bot.x, y: bot.y, angle: bot.angle, speed: 12, damage: 60 }); bot.lastShot = now; } else if (menorD > 600 || !visaoLimpa) { moverEntidade(bot, Math.cos(bot.angle) * bot.speed, Math.sin(bot.angle) * bot.speed); } } else if (bot.attackState === 3) { if (menorD > 150 || !visaoLimpa) moverEntidade(bot, Math.cos(bot.angle) * bot.speed, Math.sin(bot.angle) * bot.speed); if (visaoLimpa && now - bot.lastShot > 200) { bullets.push({ ownerId: bot.id, teamId: bot.teamId, x: bot.x, y: bot.y, angle: bot.angle + (Math.random() * 0.8 - 0.4), speed: 5, damage: 5, skin: "boss" }); bot.lastShot = now; tocarSom("powerup"); } }
+                    } else { if (!bot.patrolPoint || Math.hypot(bot.patrolPoint.x - bot.x, bot.patrolPoint.y - bot.y) < 40) { bot.patrolPoint = getValidSpawn(false, false, 60); } let ang = Math.atan2(bot.patrolPoint.y - bot.y, bot.patrolPoint.x - bot.x); bot.angle = ang; moverEntidade(bot, Math.cos(ang) * bot.speed, Math.sin(ang) * bot.speed); }
                 } else {
                     // --- IA ADAPTATIVA E PREDITIVA ---
                     if (now - (bot.lastThink || 0) > 250) {
