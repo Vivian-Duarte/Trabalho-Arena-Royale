@@ -919,3 +919,72 @@ A Etapa 3 foi validada com todos os testes automatizados passando.
 - [x] Movimento do Titã mais natural quando cercado por bots.
 
 Com isso, o Titã passou a contar com uma camada própria de destravamento em paredes, sem comprometer o comportamento dos bots comuns e sem quebrar a validação espacial já implementada anteriormente. Além disso, o ajuste complementar no comportamento do Chefão reduziu o zigue-zague acelerado, tornando a experiência de combate mais natural.
+
+
+### II - Inteligência Artificial e Comportamento Estratégico4. 
+
+## 4. Consciência Espacial e Movimentação Estratégica
+A movimentação das entidades evoluiu de um comportamento puramente reativo para um sistema preditivo, consciente da topologia do mapa e das condições de estado do bot.
+
+Problema
+As entidades operavam sem "memória" ou conhecimento estrutural da arena, limitando a capacidade de manobras complexas e tornando o comportamento previsível em níveis avançados.
+
+Solução
+A estratégia consistiu em vincular o grau de consciência geográfica das entidades à progressão dos níveis da partida, utilizando a dificuldade como um multiplicador de privilégios de informação.
+
+## 4.1 Lógica de Consciência por Nível (Map Awareness) 
+Para permitir que a IA evolua conforme o progresso do jogador, implementamos uma hierarquia de acesso a dados:
+
+Níveis 1-2 (Reativo): Os agentes operam sob uma lógica de perseguição direta, processando apenas a posição vetorial do jogador.
+Níveis 3+ (Preditivo): O agente desbloqueia o scan estrutural da arena, permitindo a identificação de zonas de perigo, itens de cura e atalhos geométricos.Mecânica de Busca por CuraQuando o atributo de integridade (HP) cai abaixo de 60%, o agente suspende a perseguição e computa uma rota de menor custo para a caixa de vida mais próxima.
+
+## 4.2 Movimentação Preditiva
+Para elevar a movimentação além da perseguição linear, a IA calcula um vetor de interceptação em vez da posição absoluta.
+
+Algoritmo de PrediçãoA IA calcula um fator de antecipação baseado na velocidade atual do jogador:
+
+JavaScriptalvoX = player.x + (player.vx * antecipacao);
+alvoY = player.y + (player.vy * antecipacao);
+
+Isso força o agente a deslocar-se para o ponto de colisão futura, criando um comportamento de combate agressivo e estratégico.
+
+## 4.3 Otimização (Filtro de Frequência)
+Para evitar gargalos de processamento, o "raciocínio" espacial não ocorre em tempo integral. A lógica é condicionada por um temporizador de 250ms, garantindo que o custo computacional permaneça estável independentemente da complexidade da cena.
+
+### 5. IA Adaptativa: 
+
+## Aprendizado por Reforço Simplificado
+O Titã (Chefão) utiliza um sistema baseado em pesos (Score-based Learning), permitindo que ele ajuste sua tática de combate em tempo real conforme a eficácia de cada ação.
+
+## 5.1 Matriz de Recompensas
+
+Cada estado de ataque (0 a 3) possui um peso dinâmico que oscila conforme o retorno das ações:
+
+## 5.2 Política de Seleção (Epsilon-Greedy)
+O Titã prioriza a estratégia com maior peso (90% do tempo), mas reserva 10% de suas decisões para testar outras abordagens, garantindo adaptação caso o jogador mude seu estilo de jogo.
+
+### 6. Comandos de Validação e Diagnóstico
+Utilize os comandos abaixo no console do navegador para inspecionar a IA durante o tempo de execução:Diagnóstico de IA e Aprendizado
+
+JavaScript// Localizar o objeto do Titã
+bots.find(b => b.isBoss);
+
+// Verificar a matriz de pesos (memória de aprendizado)
+bots.find(b => b.isBoss).acoes;
+
+// Forçar uma mudança de estado de ataque para testar a lógica
+bots.find(b => b.isBoss).attackState = 1;
+Monitoramento EspacialJavaScript// Monitorar se o bot detecta a caixa de vida (hp < 60)
+bots.forEach(b => {
+    if (b.hp < 60) console.log(`Bot ${b.id} buscando caixa de vida:`, b.patrolPoint);
+});
+
+
+## Modularidade: 
+A lógica foi isolada em boss-rewardlogic.js, garantindo a Separation of Concerns.
+
+## Aprendizado em Tempo Real: 
+O monitoramento via console validou a transição dinâmica dos estados de ataque, demonstrando resiliência.
+
+## Performance: 
+A combinação de filtros de frequência e políticas simplificadas permitiu a implementação de uma IA complexa sem degradação da experiência do usuário."A transição de um modelo reativo para um modelo adaptativo elevou a complexidade tática do Mega Arena Royale, transformando o combate em um ecossistema dinâmico de ação e reação."
