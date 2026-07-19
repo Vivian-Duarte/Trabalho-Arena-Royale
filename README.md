@@ -1353,7 +1353,7 @@ A Etapa 4 foi validada com sucesso.
 Com isso, o Chefão passou a contar com uma tomada de decisão básica, estável e pouco invasiva. A solução reduz a paralisia decisória ao manter um alvo primário definido por alguns segundos, sem comprometer as etapas anteriores de desvio local, validação espacial e destravamento do Titã em paredes.
 
 
-# II - Inteligência Artificial e Comportamento Estratégico4. 
+# II - Inteligência Artificial e Comportamento Estratégico. 
 
 ## 5. Consciência Espacial e Movimentação Estratégica
 A movimentação das entidades evoluiu de um comportamento puramente reativo para um sistema preditivo, consciente da topologia do mapa e das condições de estado do bot.
