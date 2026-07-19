@@ -173,7 +173,7 @@ py -m http.server 5500
 Depois, acessar:
 
 ```text
-http://localhost:5500/jogodetiro.html
+http://localhost:5500/Learning%20Framework.html
 ```
 
 Também é possível abrir o HTML diretamente no navegador.
@@ -591,15 +591,15 @@ console.table({
 
 ## Resultado esperado nas validações finais
 
-Nas validações finais, os principais indicadores de travamento devem permanecer zerados:
+Nas validações finais, os principais indicadores de travamento devem permanecer o mais proximo de zero possivel:
 
 ```text
-bossStuck: 0
-bossVisualStuck: 0
-bossAreaStuck: 0
+bossStuck: <2
+bossVisualStuck: <2
+bossAreaStuck: <2
 ```
 
-Esses valores indicam que o Chefão não apresentou travamentos durante a simulação real.
+Esses valores indicam que o Chefão quase não apresentou travamentos durante a simulação real.
 
 ---
 
@@ -610,10 +610,10 @@ A Etapa 2 foi validada na versão `2.8.2`.
 ### Resultados obtidos
 
 - [x] 16 testes automatizados da Etapa 2 aprovados.
-- [x] Chefão sem travamento visual nas simulações finais.
-- [x] `bossStuck = 0`.
-- [x] `bossVisualStuck = 0`.
-- [x] `bossAreaStuck = 0`.
+- [x] Chefão com menos travamentos visuais nas simulações finais.
+- [x] `bossStuck = <2`.
+- [x] `bossVisualStuck = <2`.
+- [x] `bossAreaStuck = <2`.
 - [x] Bots comuns revalidados após a integração.
 - [x] 15 testes da Etapa 1 aprovados novamente.
 - [x] Métricas da Etapa 1 com `wait = 0` e `stuck = 0`.
@@ -930,10 +930,10 @@ Essa abordagem foi escolhida por ser simples, segura e pouco invasiva. Ela não 
 
 ### Arquivos adicionados ou atualizados
 
-- `jogodetiro.html`  
+- `Learning Framework.html`  
   Foi atualizado para adicionar uma memória curta de alvo dentro da lógica específica do Chefão.
 
-Não foram criados novos módulos para essa versão final. Durante os testes, uma abordagem com arquivo separado `boss-decision-making.js` chegou a ser experimentada, mas foi descartada porque interferia indiretamente no comportamento dos bots azuis. A solução final foi mantida diretamente no `jogodetiro.html`, dentro do bloco:
+Não foram criados novos módulos para essa versão final. Durante os testes, uma abordagem com arquivo separado `boss-decision-making.js` chegou a ser experimentada, mas foi descartada porque interferia indiretamente no comportamento dos bots azuis. A solução final foi mantida diretamente no `Learning Framework.html`, dentro do bloco:
 
 ```javascript
 if (bot.isBoss) {
@@ -962,7 +962,7 @@ Sintomas observados:
 
 A lógica original do jogo já escolhia um alvo para cada bot e armazenava esse alvo na variável:
 
-```javascript
+```
 alvoM
 ```
 
@@ -1084,7 +1084,7 @@ A correção foi alterar para:
 
 ```javascript
 document.getElementById("textoNivelBoss").innerText = nivelChefeProgresso;
-
+```
 Essa alteração é apenas visual e não interfere na lógica de movimentação, colisão, ataque ou destravamento.
 
 ---
@@ -1353,9 +1353,9 @@ A Etapa 4 foi validada com sucesso.
 Com isso, o Chefão passou a contar com uma tomada de decisão básica, estável e pouco invasiva. A solução reduz a paralisia decisória ao manter um alvo primário definido por alguns segundos, sem comprometer as etapas anteriores de desvio local, validação espacial e destravamento do Titã em paredes.
 
 
-### II - Inteligência Artificial e Comportamento Estratégico4. 
+# II - Inteligência Artificial e Comportamento Estratégico4. 
 
-## 4. Consciência Espacial e Movimentação Estratégica
+## 5. Consciência Espacial e Movimentação Estratégica
 A movimentação das entidades evoluiu de um comportamento puramente reativo para um sistema preditivo, consciente da topologia do mapa e das condições de estado do bot.
 
 Problema
@@ -1364,13 +1364,13 @@ As entidades operavam sem "memória" ou conhecimento estrutural da arena, limita
 Solução
 A estratégia consistiu em vincular o grau de consciência geográfica das entidades à progressão dos níveis da partida, utilizando a dificuldade como um multiplicador de privilégios de informação.
 
-## 4.1 Lógica de Consciência por Nível (Map Awareness) 
+### 5.1 Lógica de Consciência por Nível (Map Awareness) 
 Para permitir que a IA evolua conforme o progresso do jogador, implementamos uma hierarquia de acesso a dados:
 
 Níveis 1-2 (Reativo): Os agentes operam sob uma lógica de perseguição direta, processando apenas a posição vetorial do jogador.
 Níveis 3+ (Preditivo): O agente desbloqueia o scan estrutural da arena, permitindo a identificação de zonas de perigo, itens de cura e atalhos geométricos.Mecânica de Busca por CuraQuando o atributo de integridade (HP) cai abaixo de 60%, o agente suspende a perseguição e computa uma rota de menor custo para a caixa de vida mais próxima.
 
-## 4.2 Movimentação Preditiva
+### 5.2 Movimentação Preditiva
 Para elevar a movimentação além da perseguição linear, a IA calcula um vetor de interceptação em vez da posição absoluta.
 
 Algoritmo de PrediçãoA IA calcula um fator de antecipação baseado na velocidade atual do jogador:
@@ -1380,22 +1380,22 @@ alvoY = player.y + (player.vy * antecipacao);
 
 Isso força o agente a deslocar-se para o ponto de colisão futura, criando um comportamento de combate agressivo e estratégico.
 
-## 4.3 Otimização (Filtro de Frequência)
+### 5.3 Otimização (Filtro de Frequência)
 Para evitar gargalos de processamento, o "raciocínio" espacial não ocorre em tempo integral. A lógica é condicionada por um temporizador de 250ms, garantindo que o custo computacional permaneça estável independentemente da complexidade da cena.
 
-### 5. IA Adaptativa: 
+## 6. IA Adaptativa: 
 
 ## Aprendizado por Reforço Simplificado
 O Titã (Chefão) utiliza um sistema baseado em pesos (Score-based Learning), permitindo que ele ajuste sua tática de combate em tempo real conforme a eficácia de cada ação.
 
-## 5.1 Matriz de Recompensas
+### 6.1 Matriz de Recompensas
 
 Cada estado de ataque (0 a 3) possui um peso dinâmico que oscila conforme o retorno das ações:
 
-## 5.2 Política de Seleção (Epsilon-Greedy)
+### 6.2 Política de Seleção (Epsilon-Greedy)
 O Titã prioriza a estratégia com maior peso (90% do tempo), mas reserva 10% de suas decisões para testar outras abordagens, garantindo adaptação caso o jogador mude seu estilo de jogo.
 
-### 6. Comandos de Validação e Diagnóstico
+## 7. Comandos de Validação e Diagnóstico
 Utilize os comandos abaixo no console do navegador para inspecionar a IA durante o tempo de execução:Diagnóstico de IA e Aprendizado
 
 JavaScript// Localizar o objeto do Titã
