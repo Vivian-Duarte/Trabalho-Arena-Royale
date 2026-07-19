@@ -1453,6 +1453,49 @@
                 if (!isIgnoring) { if (player.hp > 0 && player.teamId !== bot.teamId) { let d = Math.hypot(player.x - bot.x, player.y - bot.y); if (d < menorD) { menorD = d; alvoM = player; } } bots.forEach(o => { if (o.teamId !== bot.teamId) { let d = Math.hypot(o.x - bot.x, o.y - bot.y); if (d < menorD) { menorD = d; alvoM = o; } } }); }
                 let visaoLimpa = alvoM ? !temParede(bot.x, bot.y, alvoM.x, alvoM.y) : false; if (alvoM && !visaoLimpa) alvoM = null;
                 if (bot.isBoss) {
+                    // Processamento Visual e Tomada de Decisão do Chefão.
+                    // Método seguro: mantém o alvo que a lógica antiga já escolheu por 3 segundos.
+                    // Não altera movimento, armas, bots azuis ou destravamento em paredes.
+                    if (!window.BossDecisionBasicStats) {
+                        window.BossDecisionBasicStats = {
+                            locks: 0,
+                            reuses: 0,
+                            switches: 0,
+                            lastTargetId: null,
+                            lastReason: null
+                        };
+                    }
+
+                    if (alvoM) {
+                        const alvoTravadoAindaValido =
+                            bot.bossLockedTarget &&
+                            bot.bossLockedTarget.hp > 0 &&
+                            now < (bot.bossLockedUntil || 0);
+
+                        if (alvoTravadoAindaValido) {
+                            alvoM = bot.bossLockedTarget;
+                            menorD = Math.hypot(alvoM.x - bot.x, alvoM.y - bot.y);
+                            visaoLimpa = !temParede(bot.x, bot.y, alvoM.x, alvoM.y);
+
+                            window.BossDecisionBasicStats.reuses += 1;
+                            window.BossDecisionBasicStats.lastTargetId = alvoM.id || "player";
+                            window.BossDecisionBasicStats.lastReason = "mantendo_alvo_por_3_segundos";
+                        } else {
+                            const novoAlvoId = alvoM.id || "player";
+
+                            if (bot.bossLockedTargetId && bot.bossLockedTargetId !== novoAlvoId) {
+                                window.BossDecisionBasicStats.switches += 1;
+                            }
+
+                            bot.bossLockedTarget = alvoM;
+                            bot.bossLockedTargetId = novoAlvoId;
+                            bot.bossLockedUntil = now + 3000;
+
+                            window.BossDecisionBasicStats.locks += 1;
+                            window.BossDecisionBasicStats.lastTargetId = novoAlvoId;
+                            window.BossDecisionBasicStats.lastReason = "novo_alvo_travado";
+                        }
+                    }
                     if (alvoM) {
                         bot.angle = Math.atan2(alvoM.y - bot.y, alvoM.x - bot.x); if (now - bot.lastAttackChange > 3000) {
                             let totalScore = Object.values(bot.acoes).reduce((a, b) => a + b, 0);
