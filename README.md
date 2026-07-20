@@ -1420,3 +1420,17 @@ O monitoramento via console validou a transição dinâmica dos estados de ataqu
 
 ## Performance: 
 A combinação de filtros de frequência e políticas simplificadas permitiu a implementação de uma IA complexa sem degradação da experiência do usuário."A transição de um modelo reativo para um modelo adaptativo elevou a complexidade tática do Mega Arena Royale, transformando o combate em um ecossistema dinâmico de ação e reação."
+
+# III - Design de Combate (Titã)
+
+## 8. Sistema de Fases e Esquiva Preditiva
+
+O comportamento do Titã apresentava pouca variação, tornando o combate previsível e sem reações eficientes aos ataques do jogador. A solução adotada consiste na implementação de uma classe orquestradora de design de combate, denominada boss-combat-design.js. O objetivo dessa estrutura é avaliar continuamente a vida da entidade e aplicar modificadores progressivos de dificuldade, separando a lógica de combate para evitar a superlotação do loop principal de atualização do jogo.
+
+A classe atua primordialmente como um controlador de estado, aplicando um sistema de quatro fases evolutivas baseado na porcentagem de saúde do chefe. Na **Fase 1**, ativada com a vida acima de setenta por cento, o Titã movimenta-se com lentidão e possui maior escala geométrica. Na **Fase 2**, iniciada ao atingir quarenta por cento, estabelece-se um equilíbrio de status com o incremento da velocidade de movimentação e o retorno ao tamanho normal. 
+
+Ao entrar na **Fase 3**, aos quinze por cento, a agressividade é ampliada com o aumento substancial da velocidade e a redução do tamanho físico para dificultar os disparos inimigos. Por fim, a **Fase 4** é acionada abaixo de quinze por cento, caracterizando o modo fúria, onde o chefe atinge velocidade extrema e adquire a habilidade de roubo de vida equivalente a cinco por cento do dano causado.
+
+Além do sistema de fases, a classe é responsável pelo processamento geométrico da **Esquiva Preditiva** do Titã. O algoritmo realiza uma varredura contínua no vetor de projéteis ativos na arena para identificar riscos de colisão. Caso a trajetória de um disparo intercepte a área volumétrica do chefe, o sistema calcula um vetor perpendicular de escape. A probabilidade de execução dessa esquiva é escalonada dinamicamente, aumentando conforme a vida do Titã diminui ou a dificuldade do jogo se eleva.
+
+A **Integração Final** com o motor principal do jogo é executada dentro do bloco condicional já existente para as atualizações do chefe. Os parâmetros físicos do Titã são sobrescritos com os novos valores estabelecidos pela sua fase atual, enquanto o vetor de escape lateral é inserido diretamente na função original de movimentação. Esse procedimento assegura que a entidade deslize lateralmente para contornar os projéteis sem que as regras físicas nativas do motor gráfico sejam comprometidas.
