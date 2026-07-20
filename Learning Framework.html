@@ -1003,6 +1003,8 @@
         <button class="btn btn-loja" onclick="voltarAoMenu()">VOLTAR AO MENU</button>
     </div>
 
+    <script src="boss-combat-design.js"></script>
+
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
@@ -1453,6 +1455,35 @@
                 if (!isIgnoring) { if (player.hp > 0 && player.teamId !== bot.teamId) { let d = Math.hypot(player.x - bot.x, player.y - bot.y); if (d < menorD) { menorD = d; alvoM = player; } } bots.forEach(o => { if (o.teamId !== bot.teamId) { let d = Math.hypot(o.x - bot.x, o.y - bot.y); if (d < menorD) { menorD = d; alvoM = o; } } }); }
                 let visaoLimpa = alvoM ? !temParede(bot.x, bot.y, alvoM.x, alvoM.y) : false; if (alvoM && !visaoLimpa) alvoM = null;
                 if (bot.isBoss) {
+                    //III: Design de Combate (Titã)
+                    // 1. Inicia a classe de combate na primeira vez que o chefão agir
+                    if (!bot.combatDesign) {
+                        bot.baseSpeed = bot.speed;
+                        bot.baseSize = bot.radius; // O jogo usa 'radius', mas sua classe usa 'size'
+                        bot.combatDesign = new BossCombatDesign(bot);
+                    }
+
+                    // 2. Atualiza a fase com base na vida atual
+                    bot.combatDesign.updatePhase(bot.hp, bot.maxHp);
+                    bot.radius = bot.size || bot.radius; // Sincroniza o tamanho físico para colisões
+
+                    // 3. Adapta os projéteis do jogo para o formato vetorial que a sua classe exige
+                    let projeteisFormatados = bullets.map(b => ({
+                        x: b.x, 
+                        y: b.y,
+                        velocity: { x: Math.cos(b.angle) * b.speed, y: Math.sin(b.angle) * b.speed }
+                    }));
+
+                    // 4. Calcula e aplica a Esquiva Preditiva
+                    let vetorEsquiva = bot.combatDesign.calculatePredictiveDodge(projeteisFormatados, dificuldade);
+                    if (vetorEsquiva) {
+                        // Normaliza o vetor para manter a velocidade do chefão
+                        let length = Math.hypot(vetorEsquiva.x, vetorEsquiva.y);
+                        let direcaoX = (vetorEsquiva.x / length) * bot.speed;
+                        let direcaoY = (vetorEsquiva.y / length) * bot.speed;
+                        
+                        moverEntidade(bot, direcaoX, direcaoY);
+                    }
                     // Processamento Visual e Tomada de Decisão do Chefão.
                     // Método seguro: mantém o alvo que a lógica antiga já escolheu por 3 segundos.
                     // Não altera movimento, armas, bots azuis ou destravamento em paredes.
